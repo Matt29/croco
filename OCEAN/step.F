@@ -1078,11 +1078,9 @@ C$OMP END MASTER
 
       ntrds=omp_get_num_threads()
       trd=omp_get_thread_num()
-C$OMP BARRIER
       range=(NSUB_X*NSUB_E+ntrds-1)/ntrds
       my_first=trd*range
       my_last=min(my_first + range-1, NSUB_X*NSUB_E-1)
-C$OMP BARRIER
 
 #ifdef SOLVE3D
 
@@ -1251,7 +1249,6 @@ C$OMP MASTER
       nbcoarse = 1 + mod(nbcoarse, Agrif_IRhot())
 #endif
 C$OMP END MASTER
-C$OMP BARRIER
 
       return
       end

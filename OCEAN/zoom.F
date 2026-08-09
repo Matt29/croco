@@ -54,6 +54,9 @@
       implicit none
 # ifdef MPI
       integer ierr
+#  ifdef OPENMP
+      integer mpi_thread_provided
+#  endif
 # endif
 # include "param.h"
 # include "private_scratch.h"
@@ -78,7 +81,17 @@
 #  elif defined OA_COUPLING || defined OW_COUPLING
            call cpl_prism_init
 #  else
+#   ifdef OPENMP
+           call MPI_Init_thread(MPI_THREAD_SERIALIZED,
+     &                          mpi_thread_provided,ierr)
+           if (mpi_thread_provided.lt.MPI_THREAD_SERIALIZED) then
+             write(*,*) 'HYBRID ERROR: MPI_THREAD_SERIALIZED',
+     &                    ' unavailable.'
+             call MPI_Abort(MPI_COMM_WORLD,2,ierr)
+           endif
+#   else
            call MPI_Init(ierr)
+#   endif
 #  endif
            MPIisinitialize = .TRUE.
         ENDIF
@@ -104,6 +117,14 @@
 # include "dynderivparam.h"
 # ifdef MPI
       call MPI_Setup(ierr)
+#  ifdef OPENMP
+      if ((NSUB_X.gt.1 .and. Lm.lt.3*NSUB_X) .or.
+     &    (NSUB_E.gt.1 .and. Mm.lt.3*NSUB_E)) then
+        write(*,*) 'HYBRID ERROR: OpenMP tiles are too narrow.',
+     &             ' NSUB=',NSUB_X,NSUB_E,' local grid=',Lm,Mm
+        call MPI_Abort(MPI_COMM_WORLD,3,ierr)
+      endif
+#  endif
 # endif
 
       return

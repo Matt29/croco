@@ -44,7 +44,7 @@
 #ifdef SST_SKIN
 # include "forces.h"
 #endif
-      integer Istr,Iend,Jstr,Jend, i,j,k, itrc
+      integer Istr,Iend,Jstr,Jend, i,j,k, itrc, ipas
 #if defined SUBSTANCE || defined SEDIMENT
       integer :: iv
 #endif
@@ -1247,6 +1247,27 @@ C$OMP BARRIER
 !--------------------------------------------------------------------
 !
 # ifdef PASSIVE_TRACER
+#  ifdef PASSIVE_TRACER_10
+! The physical initial file does not contain the benchmark passives.
+! Initialise each missing passive with a deterministic, non-uniform
+! three-dimensional field.  h and k are invariant under MPI/OpenMP
+! decomposition, and the tracer offset keeps all ten fields distinct.
+      do ipas=1,ntrc_pas
+        itrc=itpas+ipas-1
+        if (.not.got_tini(itrc)) then
+          do k=1,N
+            do j=JR_RANGE
+              do i=IR_RANGE
+                t(i,j,k,1,itrc)=0.1*float(ipas)
+     &                    +0.01*float(k)/float(N)
+     &                    +0.05*h(i,j)/(h(i,j)+300.)
+                t(i,j,k,2,itrc)=t(i,j,k,1,itrc)
+              enddo
+            enddo
+          enddo
+        endif
+      enddo
+#  else
       do k=1,N
         do j=JR_RANGE
           do i=IR_RANGE
@@ -1310,6 +1331,7 @@ C$OMP BARRIER
           enddo
         enddo
       enddo
+#  endif /* PASSIVE_TRACER_10 */
 # endif /* PASSIVE_TRACER */
 !
 !
@@ -2282,4 +2304,3 @@ C$OMP BARRIER
       return
       end
 #endif /* JET */
-

@@ -18,11 +18,19 @@
 !
       implicit none
       integer tile,  trd,omp_get_thread_num
+#ifdef TRACER_TIMING
+      integer*8 tracer_clock_start,tracer_clock_rate,tracer_clock_max
+# include "tracer_timing.h"
+#endif
 # include "param.h"
 # include "private_scratch.h"
 # include "ocean3d.h"
 # include "compute_tile_bounds.h"
       trd=omp_get_thread_num()
+#ifdef TRACER_TIMING
+      call tracer_timing_start(tracer_clock_start,tracer_clock_rate,
+     &                         tracer_clock_max)
+#endif
       call pre_step3d_tile (Istr,Iend,Jstr,Jend,
      &                A3d(1,1,trd), A3d(1,2,trd), A3d(1,3,trd),
      &                A2d(1,1,trd), A2d(1,2,trd), A2d(1,3,trd),
@@ -35,6 +43,11 @@
 # endif
      &                                          , A3d(1,8,trd)         
      &                                                        )
+#ifdef TRACER_TIMING
+      call tracer_timing_add(tracer_timing_pre_step3d,trd,
+     &                       tracer_clock_start,tracer_clock_rate,
+     &                       tracer_clock_max)
+#endif
       return
       end
 

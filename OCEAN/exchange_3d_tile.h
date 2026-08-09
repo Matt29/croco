@@ -24,6 +24,11 @@
 #endif
       real A(GLOBAL_2D_ARRAY,KSTART:N)
       integer Istr,Iend,Jstr,Jend, i,j,k
+#if defined MPI && defined OPENMP
+      real hybrid_A3d(GLOBAL_2D_ARRAY,0:N)
+      integer hI0,hI1,hJ0,hJ1
+      common /hybrid_exchange_3d/ hybrid_A3d
+#endif
 !
 #include "compute_auxiliary_bounds.h"
 !
@@ -140,21 +145,152 @@
 #endif
 !$acc end kernels		   
 #ifdef MPI
+# ifdef OPENMP
+      if (hybrid_master_exchange) then
+        k=N-KSTART+1
+#  ifndef MP_3PTS
+#   ifndef MP_M3FAST_SEDLAYERS
+        call MessPass3D_tile (Istr,Iend,Jstr,Jend, A,k)
+#   else
+        call MessPass3D_sl_tile (Istr,Iend,Jstr,Jend, A,k)
+#   endif
+#  else
+#   ifndef MP_M3FAST_SEDLAYERS
+        call MessPass3D_3pts_tile (Istr,Iend,Jstr,Jend, A,k)
+#   else
+        call MessPass3D_3pts_sl_tile (Istr,Iend,Jstr,Jend, A,k)
+#   endif
+#  endif
+      else
+      hI0=Istr
+      hI1=Iend
+      hJ0=Jstr
+      hJ1=Jend
+      if (WESTERN_EDGE) hI0=Istr-Npts
+      if (EASTERN_EDGE) hI1=Iend+Npts
+      if (SOUTHERN_EDGE) hJ0=Jstr-Npts
+      if (NORTHERN_EDGE) hJ1=Jend+Npts
+
+      if (Istr.eq.1) then
+        do k=KSTART,N
+          do j=hJ0,hJ1
+            do i=1,min(Npts,Iend)
+              hybrid_A3d(i,j,k)=A(i,j,k)
+            enddo
+          enddo
+        enddo
+      endif
+      if (Iend.eq.Lmmpi) then
+        do k=KSTART,N
+          do j=hJ0,hJ1
+            do i=max(Istr,Lmmpi-Npts+1),Lmmpi
+              hybrid_A3d(i,j,k)=A(i,j,k)
+            enddo
+          enddo
+        enddo
+      endif
+      if (Jstr.eq.1) then
+        do k=KSTART,N
+          do j=1,min(Npts,Jend)
+            do i=hI0,hI1
+              hybrid_A3d(i,j,k)=A(i,j,k)
+            enddo
+          enddo
+        enddo
+      endif
+      if (Jend.eq.Mmmpi) then
+        do k=KSTART,N
+          do j=max(Jstr,Mmmpi-Npts+1),Mmmpi
+            do i=hI0,hI1
+              hybrid_A3d(i,j,k)=A(i,j,k)
+            enddo
+          enddo
+        enddo
+      endif
+C$OMP BARRIER
+C$OMP MASTER
+# endif
       k=N-KSTART+1
 # ifndef MP_3PTS
 #   ifndef MP_M3FAST_SEDLAYERS
+#    ifdef OPENMP
+      call MessPass3D_tile (1,Lmmpi,1,Mmmpi,
+     &                     hybrid_A3d(START_2D_ARRAY,KSTART),k)
+#    else
       call MessPass3D_tile (Istr,Iend,Jstr,Jend,  A,k)
+#    endif
 #   else
+#    ifdef OPENMP
+      call MessPass3D_sl_tile (1,Lmmpi,1,Mmmpi,
+     &                     hybrid_A3d(START_2D_ARRAY,KSTART),k)
+#    else
       call MessPass3D_sl_tile (Istr,Iend,Jstr,Jend,  A,k)
+#    endif
 #   endif      
 #  else
 !!  MP_3PTS        
 #   ifndef MP_M3FAST_SEDLAYERS       
+#    ifdef OPENMP
+      call MessPass3D_3pts_tile (1,Lmmpi,1,Mmmpi,
+     &                     hybrid_A3d(START_2D_ARRAY,KSTART),k)
+#    else
       call MessPass3D_3pts_tile (Istr,Iend,Jstr,Jend,  A,k)
+#    endif
 #   else
+#    ifdef OPENMP
+      call MessPass3D_3pts_sl_tile (1,Lmmpi,1,Mmmpi,
+     &                     hybrid_A3d(START_2D_ARRAY,KSTART),k)
+#    else
       call MessPass3D_3pts_sl_tile (Istr,Iend,Jstr,Jend,  A,k)      
+#    endif
 #   endif
 #endif   
+# ifdef OPENMP
+C$OMP END MASTER
+C$OMP BARRIER
+      hI0=max(1-Npts,Istr-Npts)
+      hI1=min(Lmmpi+Npts,Iend+Npts)
+      hJ0=max(1-Npts,Jstr-Npts)
+      hJ1=min(Mmmpi+Npts,Jend+Npts)
+      if (Istr.eq.1 .and. WEST_INTER2) then
+        do k=KSTART,N
+          do j=hJ0,hJ1
+            do i=1-Npts,0
+              A(i,j,k)=hybrid_A3d(i,j,k)
+            enddo
+          enddo
+        enddo
+      endif
+      if (Iend.eq.Lmmpi .and. EAST_INTER2) then
+        do k=KSTART,N
+          do j=hJ0,hJ1
+            do i=Lmmpi+1,Lmmpi+Npts
+              A(i,j,k)=hybrid_A3d(i,j,k)
+            enddo
+          enddo
+        enddo
+      endif
+      if (Jstr.eq.1 .and. SOUTH_INTER2) then
+        do k=KSTART,N
+          do j=1-Npts,0
+            do i=hI0,hI1
+              A(i,j,k)=hybrid_A3d(i,j,k)
+            enddo
+          enddo
+        enddo
+      endif
+      if (Jend.eq.Mmmpi .and. NORTH_INTER2) then
+        do k=KSTART,N
+          do j=Mmmpi+1,Mmmpi+Npts
+            do i=hI0,hI1
+              A(i,j,k)=hybrid_A3d(i,j,k)
+            enddo
+          enddo
+        enddo
+      endif
+C$OMP BARRIER
+      endif
+# endif
 #   ifdef  BAND_DEBUG          
       chkbandname='none'
 #   endif
@@ -182,4 +318,3 @@ C$OMP BARRIER
 # include "exchange_3d_tile.h"
 # undef MP_3PTS
 #endif
-

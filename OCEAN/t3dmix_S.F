@@ -13,11 +13,19 @@
       subroutine t3dmix (tile)
       implicit none
       integer tile, itrc, trd, omp_get_thread_num
+#ifdef TRACER_TIMING
+      integer*8 tracer_clock_start,tracer_clock_rate,tracer_clock_max
+# include "tracer_timing.h"
+#endif
 # include "param.h"
 # include "ncscrum.h"
 # include "private_scratch.h"
 # include "compute_tile_bounds.h"
       trd=omp_get_thread_num()
+#ifdef TRACER_TIMING
+      call tracer_timing_start(tracer_clock_start,tracer_clock_rate,
+     &                         tracer_clock_max)
+#endif
       do itrc=1,NTRA_T3DMIX
 
 # ifdef AGRIF
@@ -39,7 +47,12 @@
 # endif   /* AGRIF */
 
        enddo
-       return
+#ifdef TRACER_TIMING
+      call tracer_timing_add(tracer_timing_t3dmix,trd,
+     &                       tracer_clock_start,tracer_clock_rate,
+     &                       tracer_clock_max)
+#endif
+      return
        end
 !
 !---------------------------------------------------------------------

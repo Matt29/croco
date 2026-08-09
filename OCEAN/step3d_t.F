@@ -17,12 +17,20 @@
       integer tile
 # ifdef TRACERS
       integer trd, omp_get_thread_num
+#  ifdef TRACER_TIMING
+      integer*8 tracer_clock_start,tracer_clock_rate,tracer_clock_max
+#  include "tracer_timing.h"
+#  endif
 #  include "param.h"
 #  include "private_scratch.h"
 #  include "ocean3d.h"
 #  include "compute_tile_bounds.h"
 
       trd=omp_get_thread_num()
+#  ifdef TRACER_TIMING
+      call tracer_timing_start(tracer_clock_start,tracer_clock_rate,
+     &                         tracer_clock_max)
+#  endif
       call step3d_t_tile (Istr,Iend,Jstr,Jend,
      &                    A2d(1,1,trd), A2d(1,2,trd), A2d(1,3,trd),
      &                    A2d(1,4,trd), A2d(1,5,trd), A2d(1,6,trd),
@@ -32,6 +40,11 @@
      &   ,A3d(1,2,trd),A3d(1,3,trd),A3d(1,4,trd),A3d(1,5,trd)
 #  endif
      &                            )
+#  ifdef TRACER_TIMING
+      call tracer_timing_add(tracer_timing_step3d_t,trd,
+     &                       tracer_clock_start,tracer_clock_rate,
+     &                       tracer_clock_max)
+#  endif
 # endif /* TRACERS */      
       return
       end
@@ -1443,4 +1456,3 @@
       return
       end
 #endif  /* SOLVE3D */
-

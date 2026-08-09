@@ -476,9 +476,16 @@
       parameter (ntrc_salt=0)
 # endif
 # ifdef PASSIVE_TRACER
-#  ifdef KH_INST
+#  ifdef PASSIVE_TRACER_COUNT
+! Optional numeric preprocessor override for passive-only applications.
+      parameter (ntrc_pas=PASSIVE_TRACER_COUNT)
+#  elif defined PASSIVE_TRACER_10
+! Boolean alias used by BENCH, whose CPP-key interface toggles named keys.
+      parameter (ntrc_pas=10)
+#  elif defined KH_INST
       parameter (ntrc_pas=2)
 #  else
+! Historical default for every existing passive-tracer application.
       parameter (ntrc_pas=1)
 #  endif
 # else

@@ -116,6 +116,9 @@ C$OMP END PARALLEL
 ! Reset intra-thread communication flags and counters.
 !
       synchro_flag=.true.
+#if defined MPI && defined OPENMP
+      hybrid_master_exchange=.false.
+#endif
       first_time=0
       may_day_flag=0
 !
@@ -128,6 +131,9 @@ C$OMP END PARALLEL
         enddo
       enddo
       trd_count=0
+#ifdef TRACER_TIMING
+      call tracer_timing_init
+#endif
 !
 ! Reset record counters for averages/history output.
 !

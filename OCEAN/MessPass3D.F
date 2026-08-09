@@ -64,9 +64,14 @@ CSDISTRIBUTE_RESHAPE A(BLOCK_PATTERN) BLOCK_CLAUSE
 
 # ifdef AGRIF
       size_Z=MAXNPTS*MAXNPTS*(NP1)
+#  ifdef OPENMP
+      sub_X=Lm
+      sub_E=Mm
+#  else
       sub_X=(Lm+NSUB_X-1)/NSUB_X
-      size_X=(NP1)*MAXNPTS*(sub_X+2*MAXNPTS)
       sub_E=(Mm+NSUB_E-1)/NSUB_E
+#  endif
+      size_X=(NP1)*MAXNPTS*(sub_X+2*MAXNPTS)
       size_E=(NP1)*MAXNPTS*(sub_E+2*MAXNPTS)
 
       if(.not. allocated(buf_snd4_3D)) then
@@ -598,4 +603,3 @@ c          endif
       return
       end
 #endif
-

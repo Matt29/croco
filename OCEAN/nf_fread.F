@@ -265,6 +265,13 @@ C**  &                         'jj=',jj, 'jmin=',jmin, 'jmax=',jmax
 #endif
 #ifndef WRITER
 # if defined EW_PERIODIC || defined NS_PERIODIC  || defined MPI
+#  if defined MPI && defined OPENMP
+!
+! The forcing reader runs in an OpenMP MASTER region.  Exchange the
+! complete rank field without entering team-wide OpenMP barriers.
+!
+      hybrid_master_exchange=.true.
+#  endif
       if (horiz_type.eq.0 .and. vert_type.eq.0) then
         call exchange_r2d_tile (1,LOCALLM,1,LOCALMM, A)
       elseif (horiz_type.eq.1 .and. vert_type.eq.0) then
@@ -307,6 +314,9 @@ CC      elseif (horiz_type.eq.0 .and. vert_type.eq.3) then
 CC        call exchange_b3d_tile (1,LOCALLM,1,LOCALMM, A)
 #  endif
       endif
+#  if defined MPI && defined OPENMP
+      hybrid_master_exchange=.false.
+#  endif
 !$acc update if(compute_on_device) host(A(:,:,1:count(3)))
 # endif
 #endif

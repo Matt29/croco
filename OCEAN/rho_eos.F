@@ -643,7 +643,8 @@ c #  endif
 #  ifdef MPI
       include 'mpif.h'
 #   include "mpi_cpl.h"
-      integer ierr
+      integer ierr, quad_words
+      parameter (quad_words=QUAD/8)
       real*QUAD allrho(1,NNODES),allvol(1,NNODES)
 #  endif
 #  include "grid.h"
@@ -727,12 +728,13 @@ C$OMP CRITICAL (rho_cr_rgn)
       if (tile_count.eq.NSUB) then     ! the last thread, whoever
         tile_count=0                   ! it is, not always master.
         mrho=avg_rho/avg_vol
+        vol=avg_vol
 #  ifdef MPI
-        call MPI_ALLGATHER(mrho,1,MPI_DOUBLE_PRECISION,
-     &                   allrho,1,MPI_DOUBLE_PRECISION,
+        call MPI_ALLGATHER(mrho,quad_words,MPI_DOUBLE_PRECISION,
+     &                   allrho,quad_words,MPI_DOUBLE_PRECISION,
      &                            MPI_COMM_WORLD,ierr)
-        call MPI_ALLGATHER(vol,1,MPI_DOUBLE_PRECISION,
-     &                  allvol,1,MPI_DOUBLE_PRECISION,
+        call MPI_ALLGATHER(vol,quad_words,MPI_DOUBLE_PRECISION,
+     &                  allvol,quad_words,MPI_DOUBLE_PRECISION,
      &                           MPI_COMM_WORLD,ierr)
         mrho=QuadZero
         vol=QuadZero
@@ -765,4 +767,3 @@ C$OMP END CRITICAL (rho_cr_rgn)
       subroutine rho_eos_empty
       end
 #endif /* SOLVE3D */
-

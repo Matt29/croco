@@ -528,6 +528,11 @@
 !
       logical synchro_flag
       common /sync_flag/ synchro_flag
+#if defined MPI && defined OPENMP
+! True while a MASTER-only forcing reader exchanges a full rank field.
+      logical hybrid_master_exchange
+      common /hybrid_exchange_mode/ hybrid_master_exchange
+#endif
 
       integer may_day_flag  ! This is a shared variable among nested grids
       integer tile_count, first_time, bc_count

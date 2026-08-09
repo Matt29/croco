@@ -40,9 +40,14 @@
 
 #  ifndef AGRIF
       parameter (size_Z=MAXNPTS*MAXNPTS*(NP1),
+#   ifdef OPENMP
+     &       sub_X_3D=Lm,
+     &       sub_E_3D=Mm,
+#   else
      &       sub_X_3D=(Lm+NSUB_X-1)/NSUB_X,
+     &       sub_E_3D=(Mm+NSUB_E-1)/NSUB_E,
+#   endif
      &     size_X_3D=(NP1)*MAXNPTS*(sub_X_3D+2*MAXNPTS),
-     &     sub_E_3D=(Mm+NSUB_E-1)/NSUB_E,
      &     size_E_3D=(NP1)*MAXNPTS*(sub_E_3D+2*MAXNPTS))
 
       real ibuf_sndN_3D(size_X_3D), ibuf_revN_3D(size_X_3D),

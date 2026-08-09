@@ -27,6 +27,11 @@
 # endif
       real A(GLOBAL_2D_ARRAY)
       integer Istr,Iend,Jstr,Jend, i,j
+#if defined MPI && defined OPENMP
+      real hybrid_A2d(GLOBAL_2D_ARRAY)
+      integer hI0,hI1,hJ0,hJ1
+      common /hybrid_exchange_2d/ hybrid_A2d
+#endif
 !
 #include "compute_auxiliary_bounds.h"
 !
@@ -131,12 +136,122 @@
 		 
 		 
 #ifdef MPI
+# ifdef OPENMP
+      if (hybrid_master_exchange) then
+#  if (!defined MP_3PTS) && (!defined MP_1PTS)
+        call MessPass2D_tile (Istr,Iend,Jstr,Jend, A)
+#  elif defined MP_1PTS
+        call MessPass2D_1pts_tile (Istr,Iend,Jstr,Jend, A)
+#  else
+        call MessPass2D_3pts_tile (Istr,Iend,Jstr,Jend, A)
+#  endif
+      else
+!
+! Assemble the rank boundary in shared storage.  A can be either a
+! shared model field or a thread-private scratch field, so passing the
+! master thread's A directly to MessPass is not correct.
+!
+      hI0=Istr
+      hI1=Iend
+      hJ0=Jstr
+      hJ1=Jend
+      if (WESTERN_EDGE) hI0=Istr-Npts
+      if (EASTERN_EDGE) hI1=Iend+Npts
+      if (SOUTHERN_EDGE) hJ0=Jstr-Npts
+      if (NORTHERN_EDGE) hJ1=Jend+Npts
+
+      if (Istr.eq.1) then
+        do j=hJ0,hJ1
+          do i=1,min(Npts,Iend)
+            hybrid_A2d(i,j)=A(i,j)
+          enddo
+        enddo
+      endif
+      if (Iend.eq.Lmmpi) then
+        do j=hJ0,hJ1
+          do i=max(Istr,Lmmpi-Npts+1),Lmmpi
+            hybrid_A2d(i,j)=A(i,j)
+          enddo
+        enddo
+      endif
+      if (Jstr.eq.1) then
+        do j=1,min(Npts,Jend)
+          do i=hI0,hI1
+            hybrid_A2d(i,j)=A(i,j)
+          enddo
+        enddo
+      endif
+      if (Jend.eq.Mmmpi) then
+        do j=max(Jstr,Mmmpi-Npts+1),Mmmpi
+          do i=hI0,hI1
+            hybrid_A2d(i,j)=A(i,j)
+          enddo
+        enddo
+      endif
+C$OMP BARRIER
+C$OMP MASTER
+# endif
 #if (!defined MP_3PTS) && (!defined MP_1PTS)
+# ifdef OPENMP
+      call MessPass2D_tile (1,Lmmpi,1,Mmmpi, hybrid_A2d)
+# else
       call MessPass2D_tile (Istr,Iend,Jstr,Jend,  A)
+# endif
 #elif defined MP_1PTS
+# ifdef OPENMP
+      call MessPass2D_1pts_tile (1,Lmmpi,1,Mmmpi, hybrid_A2d)
+# else
       call MessPass2D_1pts_tile (Istr,Iend,Jstr,Jend,  A)
+# endif
+# else
+# ifdef OPENMP
+      call MessPass2D_3pts_tile (1,Lmmpi,1,Mmmpi, hybrid_A2d)
 # else
       call MessPass2D_3pts_tile (Istr,Iend,Jstr,Jend,  A)
+# endif
+# endif
+# ifdef OPENMP
+C$OMP END MASTER
+C$OMP BARRIER
+!
+! Copy received rank halos back to every participating field.  The
+! Adjacent tiles can copy the same corner values; all sources are the
+! already-completed shared staging field.
+!
+      hI0=max(1-Npts,Istr-Npts)
+      hI1=min(Lmmpi+Npts,Iend+Npts)
+      hJ0=max(1-Npts,Jstr-Npts)
+      hJ1=min(Mmmpi+Npts,Jend+Npts)
+      if (Istr.eq.1 .and. WEST_INTER2) then
+        do j=hJ0,hJ1
+          do i=1-Npts,0
+            A(i,j)=hybrid_A2d(i,j)
+          enddo
+        enddo
+      endif
+      if (Iend.eq.Lmmpi .and. EAST_INTER2) then
+        do j=hJ0,hJ1
+          do i=Lmmpi+1,Lmmpi+Npts
+            A(i,j)=hybrid_A2d(i,j)
+          enddo
+        enddo
+      endif
+      if (Jstr.eq.1 .and. SOUTH_INTER2) then
+        do j=1-Npts,0
+          do i=hI0,hI1
+            A(i,j)=hybrid_A2d(i,j)
+          enddo
+        enddo
+      endif
+      if (Jend.eq.Mmmpi .and. NORTH_INTER2) then
+        do j=Mmmpi+1,Mmmpi+Npts
+          do i=hI0,hI1
+            A(i,j)=hybrid_A2d(i,j)
+          enddo
+        enddo
+      endif
+C$OMP BARRIER
+      endif
 # endif
 #   ifdef  BAND_DEBUG          
       chkbandname='none'
