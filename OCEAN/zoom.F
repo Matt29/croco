@@ -219,7 +219,14 @@
 !----------------------------------------------------------------------
 !
       call read_inp (ierr)
-      if (ierr.ne.0) goto 100
+      if (ierr.ne.0) then
+! Fatal: a child grid without its <croco.in>.<n> input file would keep
+! running with zeroed scalars (itbulkO=0, synchro_flag=F) and crash
+! later in set_bulk_tile_online with out-of-bounds indices.
+        write(stdout,'(/1x,2A/)') 'ZOOM - ERROR: read_inp failed for ',
+     &   'child grid (missing <croco.in>.<n> file?) -- shutting down.'
+        stop 1
+      endif
 !
 !----------------------------------------------------------------------
 !  Initialize global model parameters
@@ -228,7 +235,11 @@
 !  Gobal scalar variables
 !
       call init_scalars (ierr)
-      if (ierr.ne.0) goto 100
+      if (ierr.ne.0) then
+        write(stdout,'(/1x,2A/)') 'ZOOM - ERROR: init_scalars failed ',
+     &   'for child grid -- shutting down.'
+        stop 1
+      endif
 # ifdef SOLVE3D
 !
 !  PISCES biogeochemeical model parameters
